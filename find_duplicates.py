@@ -5,9 +5,8 @@ from collections import defaultdict
 import requests
 
 # Steam application ID is 753
-#   (see https://api.steampowered.com/ISteamApps/GetAppList/v2 and https://steamcommunity.com/market/)
 # The 6 at the end is a game-specific context ID for trading cards in the Steam application
-INVENTORY_URL = "https://steamcommunity.com/id/{}/inventory/json/753/6"
+INVENTORY_URL = "https://steamcommunity.com/inventory/{}/753/6"
 MANUAL_FILEPATH = "steam.json"
 
 
@@ -27,14 +26,15 @@ def pull_inventory_json():
 
 
 def find_duplicates(data):
-    # rgInventory actually doesn't contain item amounts for cards, so we need to find duplicates in rgDescriptions
-    items_by_class_id = defaultdict(list)
-    for description_key, description_data in data['rgDescriptions'].items():
-        items_by_class_id[description_data['classid']].append(description_data)
+    # rgInventory now contains amoutns for items, but descriptions are in rgDescriptions
+    counts_by_class_instance = defaultdict(int)
+    for item in data['rgInventory'].values():
+        key = f"{item['classid']}_{item['instanceid']}"
+        counts_by_class_instance[key] += int(item.get('amount', 1))
 
     # returning (count, type, market_name) for the duplicates
-    return [(len(items), items[0]['type'], items[0]['market_name'])
-            for items in items_by_class_id.values() if len(items) > 1]
+    return [(amount, data['rgDescriptions'][k]['type'], data['rgDescriptions'][k]['market_name'])
+            for k, amount in counts_by_class_instance.items() if amount > 1 and k in data['rgDescriptions']]
 
 
 if __name__ == "__main__":
